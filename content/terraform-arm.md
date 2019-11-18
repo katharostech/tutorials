@@ -14,7 +14,7 @@ tags:
 
 This guide will walk you through setting up Terraform and Drone to provision ARM infrastructure on the AWS cloud. By the end of the tutorial you will have defined ARM infrastructure as Terraform code and configured Drone to automatically deploy changes when pull requests are merged.
 
-This guide assumes that you have a basic understanding of Git, GitHub and AWS. Specifically you will need to be able to create a GitHub repository and clone it and you will need to be able to create an AWS acount with programmatic access to the AWS API. Other than that, you do not need to have any previous experience with Drone or Terraform.
+This guide assumes that you have a basic understanding of Git, GitHub and AWS. Specifically you will need to be able to create a GitHub repository and clone it and you will need to be able to create an AWS account with programmatic access to the AWS API. Other than that, you do not need to have any previous experience with Drone or Terraform.
 
 {{< alert "info" >}}
 As we will be provisioning servers during this tutorial, you will be charged by AWS for the time that your servers are running. AWS instances are charged per-second and, with an approximate hourly cost of $0.03 USD, the charges to your account will be minimal.
@@ -35,7 +35,7 @@ provider "aws" {
 }
 
 resource "aws_instance" "web" {
-  ami           = "ami-07c52df54ded15b28"
+  ami           = "ami-0a2f75b7387637556"
   instance_type = "a1.medium"
 }
 {{< / highlight >}}
@@ -78,15 +78,15 @@ resource "aws_instance" "web" {
 
 After we have included our provider we tell Terraform to create a resource of type `aws_instance` with the name `web`. We also tell it the VM image ID ( AMI ) to use and the instance type. With the instance type, `a1` means that it is one of Amazon's ARM instances and `medium` is the size of instance.
 
-We can add as many of these resources as we want and Terraform will create them automatically on the AWS cloud. For now we will leave it at one server and we wil add another one later.
+We can add as many of these resources as we want and Terraform will create them automatically on the AWS cloud. For now we will leave it at one server and we Will add another one later.
 
-## Applying The Terraform Config
+# Applying The Terraform Config
 
 Now that we have our config written we need to apply the config to make Terraform actually do something!
 
-### Provide Credentials
+## Provide Credentials
 
-The first step will be to set the AWS environment variables that are required for the Terraform AWS provider to make changes to your cloud.
+The first step will be to set the environment variables that the AWS provider will use to authenticate.
 
 ```
 $ export AWS_ACCESS_KEY_ID="anaccesskey"
@@ -95,7 +95,7 @@ $ export AWS_SECRET_ACCESS_KEY="asecretkey"
 
 > **Note:** The above environment variables aren't the only way to provided the required credentials. [This doc](https://www.terraform.io/docs/providers/aws/index.html#environment-variables) details the other possible options.
 
-### Install Providers
+## Install Providers
 
 Before Terraform can use a provider, such as the `aws` provider we used in our Terraform file, we have to install it by running `terraform init`:
 
@@ -109,9 +109,11 @@ Initializing provider plugins...
 Terraform has been successfully initialized!
 ```
 
-Terraform reads our Terraform file and automatically detects and intalls the plugins for all of the providers that we used. Terraform puts the plugins in `.terraform/plugins` in our repo.
+Terraform reads our Terraform file and automatically detects and installs the plugins for all of the providers that we used. Terraform puts the plugins in `.terraform/plugins` in our repo.
 
-### Apply Configuration
+The `.terraform` directory should be added to your `.gitignore` file.
+
+## Apply Configuration
 
 Now that we have installed the plugins we are ready to apply the configuration.
 
@@ -182,15 +184,16 @@ When you run `terraform apply`, Terraform will plan out the changes that it need
 
 Once it is done provisioning, you will be able to see your server in the AWS management console. You have successfully automated the deployment of cloud infrastructure with Terraform!
 
-## Terraform State
+# Terraform State
 
-Now lets take a second to understand where we are at. Terraform has provisioned our resources and has also collected relevant data about those resources. For instance, we now have a server, but what is the IP address of that server? Terraform keeps track of different data for each kind of resource and everything it provisions. This data is kept in the terraform state.
+Now lets take a second to understand where we are at. Terraform has provisioned our resources and has also collected relevant data about those resources. For instance, we now have a server, but what is the IP address of that server? Terraform keeps track of different data for each kind of resource and everything it provisions. This data is kept in the Terraform state.
 
 At any time you can view the current Terraform state by running `terraform show`.
 
 ```
 $ terraform show
-aws_instance.web:
+#aws_instance.web:
+resource "aws_instance" "web" {
   id = i-09929cada1fd7a09f
   ami = ami-03ab07af3dd3a6993
   associate_public_ip_address = true
@@ -205,19 +208,22 @@ aws_instance.web:
   public_dns = ec2-123-123-123-123.compute-1.amazonaws.com
   public_ip = 456.456.456.456
   ...
+}
 ```
 
-We can see that terraform has also place a `terraform.tfstate` file in our reository, which it uses to keep track of the resoures that Terraform is managing.
+We can see that terraform has also placed a `terraform.tfstate` file in our repository, which it uses to keep track of the resources that Terraform is managing.
 
-If we run `terraform apply` again right now, Terraform will detect that your infrastructure is already in the desired configuration and it will make no changes. On the other hand, if we added another `aws_instance` resource in addition to the one we already have and we tried to run `terraform apply` again, it would create a new server to make ensure that the state of your infrastructure matches what is defined in your Terraform file.
+If we run `terraform apply` again right now, Terraform will detect that your infrastructure is already in the desired configuration and it will make no changes. On the other hand, if we added another `aws_instance` resource in addition to the one we already have, and we tried to run `terraform apply` again, it would create a new server to make ensure that the state of your infrastructure matches what is defined in your Terraform file.
 
-{{< alert "info" >}}
-At this point you may be wondi
-{{< / alert >}}
+## Accessing Your Server
 
-## Destroying Infrastructure
+At this point you may be wondering how we an access the server that we have created, through SSH for instance. It is outside of the scope of this tutorial to explain in detail how to do that, but the idea is that you can use an [`aws_key_pair`](https://www.terraform.io/docs/providers/aws/r/key_pair.html) resource and tell Terraform to create a key-pair and then create your EC2 instance with [`key_name`](https://www.terraform.io/docs/providers/aws/r/instance.html#key_name) set to the name of that key pair.
 
-When we no longer need our resoures we can remove them by running `terraform destroy`.
+This Terraform [tutorial](https://learn.hashicorp.com/terraform/getting-started/dependencies) has more information on how dependencies like that can be created between resources.
+
+# Destroying Infrastructure
+
+When we no longer need our resources we can remove them by running `terraform destroy`.
 
 {{< alert "warning" >}}
 WARNING: There is no way to recover destroyed infrastructure! Be completely sure that you do not need anything that is being destroyed before confirming the operation.
@@ -250,3 +256,40 @@ aws_instance.web: Destruction complete after 14s
 
 Destroy complete! Resources: 1 destroyed.
 ```
+
+Being able to easily create and destroy infrastructure allows you to quickly test and prove out your infrastructure plans. Terraform could also be used to provide temporary environments that may be needed for only a short time before being destroyed.
+
+# Version Controlling Your Config
+
+Now that we deployed our configuration and verified that it worked, we want to commit our code to our Git repository. Like noted above, we want to make sure that the `.terraform` directory is in our Gitignore file. We are also going to want to add the `terraform.tfstate` and `terraform.tfstate.backup` files to it:
+
+**.gitignore:**
+
+```
+.terraform
+terraform.tfstate*
+```
+
+## Source Control and the Terraform State
+
+Notice that, because we aren't tracking the Terraform state in Git, we have to track it somewhere else. Because the Terraform state is tied to your actual infrastructure in the cloud, you can't just have everybody modifying it at once. If you had your Terraform state tracked in Git, anybody who cloned your Git repository and had the proper credentials could run a `terraform apply` against your infrastructure. If you happened to have another person running Terraform with a different copy of the `terraform.tfstate`, you could easily end up causing serious problems and potentially losing data because of the lack of synchronization of the state and the config.
+
+The answer to this problem is using an alternative Terraform state backend such as [Terraform Cloud](https://www.terraform.io/docs/cloud/index.html). Terraform cloud will store the Terraform state remotely and put controls in place to make sure only one person can modify the state at any given time. We will get into setting that up in a moment.
+
+During development, it is still useful to use the local Terraform state so that you can quickly create your own *personal* development environments and verify that your Terraform config is working. When we deploy to production, though, we will use another backend such as Terraform Cloud to facilitate conurrent development of the config.
+
+## Commit and Push
+
+Now we are ready to commit our code and push it to GitHub:
+
+```
+$ git add .
+$ git commit -m 'Initial Commit'
+$ git push
+```
+
+# Setting Up Terraform Cloud
+
+Now we are are going to setup Terraform cloud. The first step is to [create an account](https://app.terraform.io/signup/account). Once you get signed in you need to create a Terraform organization to put your config into:
+
+![Create Terraform Organization](/screenshots/terraform-create-organization.png)
